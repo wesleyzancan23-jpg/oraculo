@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from prophet import Prophet
 from prophet.plot import plot_plotly
-import matplotlib.pyplot as plt # Necessário para modelo.plot_components
+import matplotlib.pyplot as plt
 
 # Configuração da página
 st.set_page_config(layout="wide")
@@ -12,7 +12,7 @@ st.title("📈 Oráculo – Previsões Inteligentes de Mercado")
 st.subheader("Dashboard Interativo para Análise e Previsão do WIN (Mini-Índice)")
 
 ###########################
-# 1) Carregar o CSV usando UPLOADER
+# 1) Carregar o CSV usando UPLOADER e TRATAMENTO DE ENCODING
 ###########################
 st.markdown("---")
 uploaded_file = st.file_uploader(
@@ -24,35 +24,51 @@ if uploaded_file is None:
     st.info("Aguardando o upload do arquivo CSV para iniciar a análise e previsão.")
     st.stop()
 
-# Tenta ler o arquivo carregado
-try:
-    # Ler o CSV com separador de ponto e vírgula, pois é o formato padrão do usuário
-    df = pd.read_csv(uploaded_file, sep=";", engine="python")
-    st.success("Arquivo carregado com sucesso!")
+# Listas de tentativas
+possible_separators = [";", ","]
+possible_encodings = ["utf-8", "latin-1", "cp1252"] # 'latin-1' ou 'cp1252' é o mais provável para o erro 0xe1
+df = None
+success = False
+used_sep = None
+used_enc = None
+colunas_necessarias = ["Data", "Hora", "Fechamento"]
 
+# Tenta todas as combinações de separador e encoding
+for sep in possible_separators:
+    for enc in possible_encodings:
+        try:
+            # Volta ao início do arquivo para cada nova tentativa de leitura
+            uploaded_file.seek(0) 
+            df_temp = pd.read_csv(uploaded_file, sep=sep, engine="python", encoding=enc)
+            
+            # Heurística de sucesso: verifica se as colunas essenciais estão presentes
+            if all(col in df_temp.columns for col in colunas_necessarias):
+                 df = df_temp # Atribui o DataFrame válido
+                 success = True
+                 used_sep = sep
+                 used_enc = enc
+                 break # Sai do loop de encodings
+            
+        except Exception:
+            continue # Tenta o próximo encoding
+    
+    if success:
+        break # Sai do loop de separadores
+
+if success:
+    st.success(f"Arquivo carregado com sucesso! (Separador: '{used_sep}', Codificação: '{used_enc}')")
     st.write("### Pré-visualização dos dados brutos:")
     st.dataframe(df.head(), use_container_width=True)
 
-except Exception as e:
-    # Se falhar com ';', tenta com ',' (um fallback comum)
-    try:
-        uploaded_file.seek(0) # Reinicia a leitura do arquivo
-        df = pd.read_csv(uploaded_file, sep=",", engine="python")
-        st.warning("Arquivo carregado usando separador de vírgula (',').")
-        st.write("### Pré-visualização dos dados brutos:")
-        st.dataframe(df.head(), use_container_width=True)
-
-    except Exception as e_fallback:
-        st.error(f"❌ Erro ao processar o arquivo CSV. Verifique se o separador é ';' ou ','. Detalhe do erro: {e_fallback}")
-        st.stop()
+else:
+    st.error("❌ Erro fatal ao processar o arquivo CSV. Tentei os separadores ';' e ',' e as codificações 'utf-8', 'latin-1', e 'cp1252', mas não consegui ler o arquivo ou encontrar as colunas essenciais. Verifique o formato do seu CSV.")
+    st.stop()
 
 ###########################
-# 2) Verificar colunas
+# 2) O df está garantido a partir daqui, mas verificamos novamente as colunas
 ###########################
-colunas_necessarias = ["Data", "Hora", "Fechamento"]
-
 if not all(col in df.columns for col in colunas_necessarias):
-    st.error(f"❌ O arquivo não contém as colunas necessárias: {', '.join(colunas_necessarias)}")
+    st.error(f"❌ O arquivo não contém as colunas necessárias, apesar das tentativas de carregamento: {', '.join(colunas_necessarias)}")
     st.write("Colunas encontradas:", df.columns.tolist())
     st.stop()
 
@@ -123,11 +139,8 @@ with col2:
 # Inicializar e treinar o modelo
 with st.spinner('Treinando o modelo Prophet e gerando previsões...'):
     modelo = Prophet(
-        # Adicionar sazonalidade diária, útil para dados de 5 minutos
         daily_seasonality=True, 
-        # Adicionar sazonalidade semanal
         weekly_seasonality=True,
-        # Adicionar sazonalidade anual
         yearly_seasonality=True
     )
     modelo.fit(df_prophet)
@@ -166,7 +179,6 @@ st.plotly_chart(grafico_previsao, use_container_width=True)
 ###########################
 st.subheader("🛠️ Análise dos Componentes do Modelo")
 st.markdown("Esta seção mostra as tendências e sazonalidades detectadas pelo modelo.")
-# Usar plt.figure() para evitar que o Streamlit exiba gráficos sobrepostos
 fig_comp = modelo.plot_components(previsao)
 st.pyplot(fig_comp, use_container_width=True)
-plt.close(fig_comp) # Fechar a figura do matplotlib para liberar memória
+plt.close(fig_comp) 
