@@ -1,8 +1,8 @@
 import numpy as np
 import streamlit as st
 import matplotlib.pyplot as plt
-from fbprophet import Prophet
-from fbprophet.plot import plot_plotly
+from prophet import Prophet
+from prophet.plot import plot_plotly
 from plotly import graph_objs as go
 from datetime import date
 import warnings
