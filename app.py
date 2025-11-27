@@ -11,7 +11,12 @@ st.subheader("Dashboard Interativo para Análise e Previsão do WIN (Mini-Índic
 try:
     df = pd.read_csv("WINZ25_F_0_5min.csv", encoding="latin1", sep=",", errors="ignore")
 except:
-    df = pd.read_csv("WINZ25_F_0_5min.csv", encoding="utf-8", sep=";", errors="ignore")
+    df = pd.read_csv(
+    "WINZ25_F_0_5min.csv",
+    encoding="latin1",   # evita erro de unicode
+    sep=";",             # seu CSV usa ponto e vírgula
+    engine="python"      # mais tolerante a erros de parsing
+)
 
 st.write("Pré-visualização dos dados:")
 st.write(df.head())
