@@ -1,78 +1,51 @@
-import numpy as np
 import streamlit as st
+import pandas as pd
 import matplotlib.pyplot as plt
 from prophet import Prophet
 from prophet.plot import plot_plotly
-from plotly import graph_objs as go
-from datetime import date
-import warnings
-import pandas as pd
-import yfinance as yf
-warnings.filterwarnings("ignore")
-
-# Define a data de início para coleta de dados
-INICIO = "2015-01-01"
-HOJE = date.today().strftime("%Y-%m-%d")
+import plotly.graph_objs as go
 
 st.title("📈 Oráculo – Previsões Inteligentes de Mercado")
+st.subheader("Dashboard Interativo para Análise e Previsão do WIN (Mini-Índice)")
 
-# 🔥 CORREÇÃO DO ERRO DE ENCODING
-df = pd.read_csv(
-    "WINZ25_F_0_5min.csv",
-    encoding="latin1",        # <- resolve o UnicodeDecodeError
-    sep=",",
-    engine="python"
-)
+# Carrega o arquivo CSV enviado
+df = pd.read_csv("WINZ25_F_0_5min.csv")
 
-# Padronizando códigos das ações conforme Yahoo Finance
-df['codigo'] = df['codigo'].apply(lambda x: x + ".SA")
+# Garante que a coluna Date exista
+df.rename(columns={"time": "Date", "date": "Date"}, inplace=True)
 
-empresas = df['codigo']
-empresa_selecionada = st.selectbox("Selecione a empresa:", empresas)
+# Converte a coluna de data se necessário
+df['Date'] = pd.to_datetime(df['Date'])
 
-@st.cache_data
-def carrega_dados(ticker):
-    dados = yf.download(ticker, INICIO, HOJE)
-    dados.reset_index(inplace=True)
-    return dados
+# Mostra dados brutos
+st.subheader("Dados Brutos")
+st.write(df.head())
 
-st.text("Carregando os dados...")
-dados = carrega_dados(empresa_selecionada)
-st.text("Dados carregados!")
+# Plot de preços
+st.subheader("Preço – Abertura e Fechamento")
+fig = go.Figure()
+fig.add_trace(go.Scatter(x=df['Date'], y=df['open'], name="Abertura"))
+fig.add_trace(go.Scatter(x=df['Date'], y=df['close'], name="Fechamento"))
+fig.layout.update(title_text="WINZ25 – 5min", xaxis_rangeslider_visible=True)
+st.plotly_chart(fig)
 
-st.subheader("Visualização dos Dados Brutos")
-st.write(dados.tail())
+# Previsão Prophet
+st.subheader("Previsões com IA – Prophet")
 
-def plot_dados_brutos():
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=dados['Date'], y=dados['Open'], name="stock_open"))
-    fig.add_trace(go.Scatter(x=dados['Date'], y=dados['Close'], name="stock_close"))
-    fig.layout.update(
-        title_text="Preço de Abertura e Fechamento das Ações",
-        xaxis_rangeslider_visible=True
-    )
-    st.plotly_chart(fig)
-
-plot_dados_brutos()
-
-st.subheader("Previsões com Machine Learning")
-
-df_treino = dados[['Date', 'Close']]
-df_treino = df_treino.rename(columns={"Date": "ds", "Close": "y"})
+df_treino = df[['Date', 'close']].rename(columns={"Date": "ds", "close": "y"})
 
 modelo = Prophet()
 modelo.fit(df_treino)
 
-num_anos = st.slider("Horizonte de previsão (anos):", 1, 4)
-periodo = num_anos * 365
+anos = st.slider("Horizonte (anos):", 1, 4)
+periodo = anos * 365
 
 futuro = modelo.make_future_dataframe(periods=periodo)
 forecast = modelo.predict(futuro)
 
-st.subheader("Dados Previstos")
-previsao = forecast[['ds', 'yhat']]
-st.write(previsao.tail())
+st.write("Últimas previsões:")
+st.write(forecast[['ds', 'yhat']].tail())
 
-st.subheader("Previsão de Preço")
-grafico2 = plot_plotly(modelo, forecast)
-st.plotly_chart(grafico2)
+st.subheader("Gráfico da Previsão")
+grafico = plot_plotly(modelo, forecast)
+st.plotly_chart(grafico)
