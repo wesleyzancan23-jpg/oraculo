@@ -1,72 +1,48 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-from prophet import Prophet
+import plotly.graph_objs as go
 
 st.title("📈 Oráculo – Previsões Inteligentes de Mercado")
 st.subheader("Dashboard Interativo para Análise e Previsão do WIN (Mini-Índice)")
 
-# -----------------------------
-# 1. TENTAR CARREGAR O CSV
-# -----------------------------
-st.write("### Pré-visualização dos dados:")
-
+# ======================
+# 1. Leitura do CSV
+# ======================
 try:
-    df = pd.read_csv(
-        "WINZ25_F_0_5min.csv",
-        sep=None,               # auto detecta separador
-        engine="python",
-        encoding="latin1",      # impede UnicodeDecodeError
-        on_bad_lines="skip"     # ignora linhas com erro
-    )
-
-    st.dataframe(df.head())
-
-except Exception as e:
+    df = pd.read_csv("WINZ25_F_0_5min.csv", sep=";", encoding="latin1")
+except:
     st.error("Erro ao carregar o arquivo CSV.")
-    st.code(str(e))
     st.stop()
 
-# -----------------------------
-# 2. VERIFICAR SE A COLUNA datetime EXISTE
-# -----------------------------
-colunas = df.columns.tolist()
+# ======================
+# 2. Exibir colunas detectadas
+# ======================
+st.write("📌 *Colunas detectadas no arquivo:*")
+st.write(list(df.columns))
 
-st.write("📌 Colunas detectadas no arquivo:", colunas)
-
-if "datetime" not in df.columns:
-    st.error("❌ O arquivo não contém a coluna 'datetime'.")
+# ======================
+# 3. Criar coluna datetime
+# ======================
+if "Data" in df.columns and "Hora" in df.columns:
+    df["datetime"] = pd.to_datetime(df["Data"] + " " + df["Hora"], dayfirst=True)
+else:
+    st.error("❌ O arquivo precisa ter colunas 'Data' e 'Hora'.")
     st.stop()
 
-# -----------------------------
-# 3. PREPARAR DADOS PARA O PROPHET
-# -----------------------------
-df["datetime"] = pd.to_datetime(df["datetime"])
+# ======================
+# 4. Renomear colunas para padrão do Prophet
+# ======================
+df_prophet = pd.DataFrame()
+df_prophet["ds"] = df["datetime"]
+df_prophet["y"] = df["Fechamento"].astype(float)
 
-df_prophet = df[["datetime", "close"]].rename(columns={
-    "datetime": "ds",
-    "close": "y"
-})
+st.subheader("Pré-visualização dos dados:")
+st.write(df_prophet.head())
 
-# -----------------------------
-# 4. TREINAR MODELO
-# -----------------------------
-st.write("### 🔮 Previsão com Prophet")
-
-modelo = Prophet()
-modelo.fit(df_prophet)
-
-# Previsão de 5 dias (480 candles de 5 min)
-periodos = 480
-futuro = modelo.make_future_dataframe(periods=periodos, freq="5min")
-
-forecast = modelo.predict(futuro)
-
-st.write("### Últimas previsões")
-st.dataframe(forecast[["ds", "yhat"]].tail())
-
-# -----------------------------
-# 5. GRÁFICO
-# -----------------------------
-fig1 = modelo.plot(forecast)
-st.pyplot(fig1)
+# ======================
+# 5. Gráfico de preços (Plotly)
+# ======================
+fig = go.Figure()
+fig.add_trace(go.Scatter(x=df["datetime"], y=df["Fechamento"], name="Fechamento"))
+fig.update_layout(title="Preço – WIN", xaxis_title="Tempo", yaxis_title="Preço")
+st.plotly_chart(fig)
