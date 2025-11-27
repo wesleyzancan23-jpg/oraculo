@@ -1,6 +1,7 @@
-streamlit>=1.18
 pandas
 numpy
+matplotlib
 plotly
 prophet
-cmdstanpy
+yfinance
+streamlit
