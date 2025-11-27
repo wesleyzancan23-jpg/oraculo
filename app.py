@@ -8,7 +8,11 @@ st.title("📈 Oráculo – Previsões Inteligentes de Mercado")
 st.subheader("Dashboard Interativo para Análise e Previsão do WIN (Mini-Índice)")
 
 # === 1) Carregar CSV ===
-df = pd.read_csv("WINZ25_F_0_5min.csv", engine="python", sep=None)
+df = pd.read_csv(
+    "WINZ25_F_0_5min.csv",
+    encoding="latin1",
+    engine="python"
+)
 
 # Mostrar prévia
 st.subheader("Pré-visualização dos dados:")
