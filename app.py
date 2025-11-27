@@ -1,56 +1,57 @@
 import streamlit as st
 import pandas as pd
-from prophet import Prophet
-from prophet.plot import plot_plotly
 import plotly.graph_objects as go
+from prophet import Prophet
 
 st.title("📈 Oráculo – Previsões Inteligentes de Mercado")
 st.subheader("Dashboard Interativo para Análise e Previsão do WIN (Mini-Índice)")
 
-# === 1) Carregar CSV ===
-df = pd.read_csv(
-    "WINZ25_F_0_5min.csv",
-    encoding="latin1",
-    engine="python"
-)
+# --- Carregar CSV ---
+try:
+    df = pd.read_csv("WINZ25_F_0_5min.csv", engine="python")
+except Exception as e:
+    st.error("Erro ao carregar o arquivo CSV.")
+    st.stop()
 
-# Mostrar prévia
+# --- Garantir que a coluna datetime existe ---
+if "datetime" not in df.columns:
+    st.error("O arquivo CSV precisa ter a coluna 'datetime'.")
+    st.write("Colunas encontradas:", df.columns.tolist())
+    st.stop()
+
+# --- Converter a coluna datetime ---
+df["datetime"] = pd.to_datetime(df["datetime"])
+
 st.subheader("Pré-visualização dos dados:")
 st.write(df.head())
 
-# === 2) Preparar dados ===
-df["datetime"] = pd.to_datetime(df["datetime"])
-df = df.sort_values("datetime")
+# --- Gráfico de preço ---
+fig = go.Figure()
+fig.add_trace(go.Scatter(x=df["datetime"], y=df["close"], name="Fechamento"))
+fig.update_layout(title="Preço de Fechamento (WIN)")
+st.plotly_chart(fig)
 
-# Preparar para o Prophet
-df_prophet = df.rename(columns={
-    "datetime": "ds",
-    "close": "y"
-})
+# --- Preparar dados para Prophet ---
+df_prophet = df[["datetime", "close"]]
+df_prophet = df_prophet.rename(columns={"datetime": "ds", "close": "y"})
 
-df_prophet = df_prophet[["ds", "y"]]
-
-# === 3) Modelo Prophet ===
+# --- Criar modelo ---
 modelo = Prophet()
 modelo.fit(df_prophet)
 
-# Seleção horizonte
-periodos = st.slider("Selecione o horizonte de previsão (em minutos):", 50, 2000, 400)
+# --- Selecionar horizonte ---
+periodos = st.slider("Dias de previsão:", 1, 30, 10)
 
+# --- Gerar datas futuras ---
 futuro = modelo.make_future_dataframe(periods=periodos, freq="5min")
-forecast = modelo.predict(futuro)
+previsao = modelo.predict(futuro)
 
-# Mostrar tabela final
-st.subheader("Previsões:")
-st.write(forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]].tail())
+st.subheader("Previsão")
+st.write(previsao[["ds", "yhat"]].tail())
 
-# === 4) Gráficos ===
-st.subheader("Gráfico de Previsão")
-grafico = plot_plotly(modelo, forecast)
-st.plotly_chart(grafico)
-
-# === 5) Gráfico do preço real ===
-st.subheader("Preço Real (Close)")
-fig = go.Figure()
-fig.add_trace(go.Scatter(x=df["datetime"], y=df["close"], name="Fechamento"))
-st.plotly_chart(fig)
+# --- Gráfico previsão ---
+fig2 = go.Figure()
+fig2.add_trace(go.Scatter(x=previsao["ds"], y=previsao["yhat"], name="Previsão"))
+fig2.add_trace(go.Scatter(x=df["datetime"], y=df["close"], name="Real"))
+fig2.update_layout(title="Previsão do WIN")
+st.plotly_chart(fig2)
