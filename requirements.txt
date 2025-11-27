@@ -1,12 +1,4 @@
 streamlit
 pandas
-numpy
 plotly
 prophet
-pandas
-numpy
-matplotlib
-plotly
-prophet
-yfinance
-streamlit
