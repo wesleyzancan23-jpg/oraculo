@@ -1,8 +1,3 @@
-# Oráculo – Previsões de Mercado
+# Robô Trading AI Dashboard
 
-Aplicativo de análise e previsão usando Streamlit + Prophet.
-
-Para rodar localmente:
-
-pip install -r requirements.txt
-streamlit run app.py
+Dashboard interativo com Streamlit para visualização de preços, candles, IA e logs em tempo real.
